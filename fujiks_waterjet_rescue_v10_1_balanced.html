@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>FUJIKS WATER JET RESCUE V10</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#07131b;color:#eef9ff;font-family:system-ui,-apple-system,"Segoe UI","Noto Sans JP",sans-serif}
+#app{max-width:1120px;margin:auto;padding:8px}
+.top{display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap}
+.logo{font-weight:1000;font-size:clamp(18px,3vw,29px)}.logo b{color:#68e0ff}
+.hud{display:flex;gap:5px;flex-wrap:wrap}.pill{padding:6px 9px;border-radius:999px;background:#102734;border:1px solid #31576b;font-size:12px;font-weight:900}
+.stage{position:relative;margin-top:8px;border-radius:18px;overflow:hidden;border:1px solid #35586b;background:#081117}
+canvas{display:block;width:100%;height:auto;touch-action:none}
+.overlay{position:absolute;inset:0;z-index:30;background:#07131df2;display:flex;align-items:center;justify-content:center;text-align:center;padding:18px}.overlay.hide{display:none}
+.card{max-width:720px}.card h1{font-size:clamp(27px,5vw,47px);margin:.2em}.card p{color:#cadce6;line-height:1.65}
+.actions{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:12px}
+.btn{border:0;border-radius:999px;background:#5edcf7;color:#04212c;font-weight:1000;font-size:16px;padding:12px 22px}
+.btn.alt{background:#263d4a;color:#eaf8ff;border:1px solid #547185}
+.controls{display:grid;grid-template-columns:1fr auto auto;gap:10px;align-items:center;margin-top:10px}
+.wheelWrap{display:flex;align-items:center;gap:12px}
+.wheel{position:relative;width:min(38vw,172px);aspect-ratio:1;border-radius:50%;border:3px solid #61c6e1;background:radial-gradient(circle,#15394c 0 27%,#102631 28% 62%,#07151d 63%);touch-action:none}
+.wheel:before,.wheel:after{content:"";position:absolute;left:50%;top:50%;background:#477486;transform:translate(-50%,-50%)}.wheel:before{width:84%;height:2px}.wheel:after{height:84%;width:2px}
+.knob{position:absolute;width:37px;height:37px;border-radius:50%;background:#6be6ff;border:4px solid white;left:50%;top:10%;transform:translate(-50%,-50%)}
+.round{width:min(26vw,135px);height:min(26vw,135px);min-width:102px;min-height:102px;border-radius:50%;font-size:18px;font-weight:1000;color:#fff;touch-action:none}
+.jet{border:4px solid #dcfaff;background:#087fa9;box-shadow:inset 0 -8px #05546e}.jet.on{background:#0ab8e8;transform:translateY(3px)}
+.pull{border:4px solid #ffe2bd;background:#9a5e21;box-shadow:inset 0 -8px #673b12}.pull.on{background:#c67b28;transform:translateY(3px)}
+.guide,.note{font-size:13px;line-height:1.55;color:#bfd2dc}.note{margin-top:9px;padding:10px 12px;background:#102532;border:1px solid #294b5e;border-radius:12px}
+.soundbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px}.toggle{border:1px solid #4f6c7c;background:#122935;color:#eaf7fc;border-radius:999px;padding:7px 11px;font-weight:800}
+@media(max-width:700px){.controls{grid-template-columns:1fr auto;}.pull{grid-column:2}.wheelWrap .guide{display:none}}
+</style>
+</head>
+<body>
+<div id="app">
+<div class="top">
+ <div class="logo">FUJIKS <b>WATER JET RESCUE V10</b></div>
+ <div class="hud">
+  <div class="pill">503 <span id="w503">78</span>%</div>
+  <div class="pill">403 <span id="w403">12</span>%</div>
+  <div class="pill">302 <span id="w302">8</span>%</div>
+  <div class="pill">立て管能力 <span id="cap">35</span>%</div>
+  <div class="pill">信頼度 <span id="trust">★★★★★</span></div>
+  <div class="pill">TIME <span id="time">130</span></div>
+ </div>
+</div>
+
+<div class="stage">
+<canvas id="game" width="980" height="700"></canvas>
+
+<div class="overlay" id="overlay">
+ <div class="card">
+  <small>採用体験ゲーム / 居住者宅 緊急排水ミッション</small>
+  <h1>見えない配管を、<br>音・匂い・排出水で読む。</h1>
+  <p>503号室のシンクは危険な状態ですが、開始直後には少し猶予があります。まず立て管の流下経路を確保し、枝管へ進入してください。誤った枝管へ入ったらJETを止め、PULLで引き戻せます。途中には配管内部が見えない区間があります。</p>
+  <div class="actions">
+   <button class="btn" id="soundOn">🔊 音ありで開始</button>
+   <button class="btn alt" id="soundOff">🔇 音なしで開始</button>
+  </div>
+ </div>
+</div>
+</div>
+
+<div class="controls">
+ <div class="wheelWrap">
+  <div class="wheel" id="wheel"><div class="knob" id="knob"></div></div>
+  <div class="guide"><b>NOZZLE GUIDE</b><br>360°方向を調整<br>JET：斜め後方への複数噴射<br>PULL：JET停止中にホースを引き戻す</div>
+ </div>
+ <button class="round jet" id="jet">JET<br>HOLD</button>
+ <button class="round pull" id="pull">HOSE<br>PULL</button>
+</div>
+
+<div class="soundbar">
+ <button class="toggle" id="toggleSound">🔊 音あり</button>
+ <span class="guide" id="sense">感覚情報：待機中</span>
+</div>
+
+<div class="note"><b>攻略の要点：</b> 立て管を先に洗って流下能力を確保 → 503号室の枝管へ正しく進入 → 見えない区間では噴射音・臭気・排出水の濁り・ホース振動を手掛かりに洗浄 → 剥がれた汚れを安全に流下 → 完全洗浄。</div>
+</div>
+
+<script>
+(()=>{
+const C=document.getElementById("game"),ctx=C.getContext("2d"),W=C.width,H=C.height;
+const O=document.getElementById("overlay"),jetB=document.getElementById("jet"),pullB=document.getElementById("pull"),wheel=document.getElementById("wheel"),knob=document.getElementById("knob");
+const E={w503:document.getElementById("w503"),w403:document.getElementById("w403"),w302:document.getElementById("w302"),cap:document.getElementById("cap"),trust:document.getElementById("trust"),time:document.getElementById("time"),sense:document.getElementById("sense"),sound:document.getElementById("toggleSound")};
+
+let run=false,jet=false,pull=false,soundOn=true,ang=-Math.PI/2,t=130,elapsed=0,last=0,raf=0;
+let noz={x:490,y:650,vx:0,vy:0},hose=[],dirt=[],chunks=[],water={503:78,403:12,302:8},trust=5,msg="",msgT=0,wrongBranch=null,inHidden=false,hiddenClean=0;
+const branches=[{y:470,side:-1,room:"302"},{y:350,side:1,room:"403"},{y:225,side:1,room:"503"}];
+let audioCtx=null,osc=null,gain=null;
+
+function beep(freq=220,dur=.08,vol=.04){
+ if(!soundOn)return;
+ try{
+  audioCtx=audioCtx||new (window.AudioContext||window.webkitAudioContext)();
+  const o=audioCtx.createOscillator(),g=audioCtx.createGain();
+  o.frequency.value=freq;g.gain.value=vol;o.connect(g);g.connect(audioCtx.destination);o.start();o.stop(audioCtx.currentTime+dur);
+ }catch(e){}
+}
+function spraySound(on){
+ if(!soundOn){stopSpray();return}
+ if(on&& !osc){
+  try{
+   audioCtx=audioCtx||new (window.AudioContext||window.webkitAudioContext)();
+   osc=audioCtx.createOscillator();gain=audioCtx.createGain();osc.type="sawtooth";osc.frequency.value=85;gain.gain.value=.018;osc.connect(gain);gain.connect(audioCtx.destination);osc.start();
+  }catch(e){}
+ } else if(!on) stopSpray()
+}
+function stopSpray(){if(osc){try{osc.stop()}catch(e){}osc=null;gain=null}}
+
+function addD(x,y,s,hard,zone){let hp=(hard?120:68)*s;dirt.push({x,y,s,hard,zone,hp,max:hp,dead:false})}
+function reset(){
+ t=130;elapsed=0;water={503:68,403:8,302:5};trust=5;noz={x:490,y:650,vx:0,vy:0};hose=[];dirt=[];chunks=[];wrongBranch=null;inHidden=false;hiddenClean=0;msg="まず立て管の流下経路を確保しよう";msgT=4;
+ for(let i=0;i<22;i++){let y=610-i*20-Math.random()*8,side=Math.random()<.5?-1:1;addD(490+side*(58+Math.random()*15),y,.48+Math.random()*.35,Math.random()<.22,"riser")}
+ [470,350,225].forEach(y=>{addD(440,y+18,.95,true,"riser");addD(540,y-14,.85,false,"riser")});
+ for(let k=0;k<10;k++)addD(585+k*30,225+(Math.random()-.5)*32,.65+Math.random()*.42,k<3,"503");
+ updateUI()
+}
+function remain(zone){let a=0,b=0;dirt.filter(d=>d.zone===zone).forEach(d=>{a+=d.max;b+=Math.max(0,d.hp)});return a?b/a:0}
+function capacity(){return Math.max(5,100-remain("riser")*100)}
+function updateUI(){
+ E.w503.textContent=Math.round(water[503]);E.w403.textContent=Math.round(water[403]);E.w302.textContent=Math.round(water[302]);E.cap.textContent=Math.round(capacity());E.trust.textContent="★".repeat(trust)+"☆".repeat(5-trust);E.time.textContent=Math.max(0,t).toFixed(1)
+}
+
+function setJet(v){if(pull&&v)return;jet=v;jetB.classList.toggle("on",v);spraySound(v)}
+function setPull(v){if(jet&&v)return;pull=v;pullB.classList.toggle("on",v)}
+jetB.addEventListener("pointerdown",e=>{e.preventDefault();setJet(true);jetB.setPointerCapture?.(e.pointerId)});jetB.addEventListener("pointerup",()=>setJet(false));jetB.addEventListener("pointercancel",()=>setJet(false));
+pullB.addEventListener("pointerdown",e=>{e.preventDefault();setPull(true);pullB.setPointerCapture?.(e.pointerId)});pullB.addEventListener("pointerup",()=>setPull(false));pullB.addEventListener("pointercancel",()=>setPull(false));
+window.addEventListener("keydown",e=>{if(e.code==="Space"){setJet(true);e.preventDefault()}if(e.key==="Shift"){setPull(true)}if(e.key==="ArrowLeft"){ang-=.08;kp()}if(e.key==="ArrowRight"){ang+=.08;kp()}});
+window.addEventListener("keyup",e=>{if(e.code==="Space")setJet(false);if(e.key==="Shift")setPull(false)});
+let drag=false;function pa(e){let r=wheel.getBoundingClientRect(),dx=e.clientX-r.left-r.width/2,dy=e.clientY-r.top-r.height/2;ang=Math.atan2(dy,dx);kp()}
+wheel.addEventListener("pointerdown",e=>{drag=true;wheel.setPointerCapture(e.pointerId);pa(e)});wheel.addEventListener("pointermove",e=>{if(drag)pa(e)});wheel.addEventListener("pointerup",()=>drag=false);
+function kp(){knob.style.left=(50+Math.cos(ang)*39)+"%";knob.style.top=(50+Math.sin(ang)*39)+"%"}kp();
+
+function spawnChunk(d){chunks.push({x:d.x,y:d.y,r:7+Math.random()*7,vy:28+Math.random()*28,stuck:false,life:0})}
+function branchNear(){for(const b of branches)if(Math.abs(noz.y-b.y)<35&&Math.abs(noz.x-490)<95)return b;return null}
+
+function updateSense(){
+ let turbidity=Math.round(Math.min(100,remain("503")*65+remain("riser")*45+chunks.length*3));
+ let odor=Math.round(Math.min(100,remain("503")*70+remain("riser")*35));
+ let vibration=(inHidden && (remain("503")>.25 || chunks.some(c=>c.stuck)))?"強い":"弱い";
+ let echo=(inHidden && remain("503")>.35)?"不規則":"安定";
+ E.sense.textContent=`感覚情報：臭気 ${odor}% ／ 排出水濁り ${turbidity}% ／ 反響 ${echo} ／ ホース振動 ${vibration}`;
+}
+
+function update(dt){
+ t-=dt;elapsed+=dt;msgT-=dt;
+ // 最初の20秒は操作を覚えるための猶予時間。
+ if(elapsed<20){
+   water[503]+=0.12*dt;
+ }else if(elapsed<45){
+   water[503]+=0.28*dt;
+ }else{
+   water[503]+=0.45*dt;
+ }
+ if(jet){noz.vx+=Math.cos(ang)*62*dt;noz.vy+=Math.sin(ang)*62*dt}
+ if(pull){
+   // pull back toward main riser and lower entry
+   if(noz.x>505)noz.vx-=95*dt;else if(noz.x<475)noz.vx+=95*dt;
+   noz.vy+=80*dt;
+ }
+ noz.vx*=.962;noz.vy*=.962;noz.x+=noz.vx*dt*2.5;noz.y+=noz.vy*dt*2.5;
+
+ if(noz.y>260 || noz.x<545){noz.x=Math.max(415,Math.min(555,noz.x))}
+ noz.y=Math.max(135,Math.min(655,noz.y));
+
+ const b=branchNear();
+ if(b&&jet){
+  const toward=b.side<0?Math.cos(ang)<-.35:Math.cos(ang)>.35;
+  if(toward){noz.x+=b.side*80*dt;if(Math.abs(noz.x-490)>72&&!b.target){
+    if(b.room!=="503"){wrongBranch=b;msg=`⚠ ${b.room}号室方向へ進入中。JET停止→PULLで戻せ！`;msgT=2.4}
+  }}
+ }
+ if(wrongBranch && Math.abs(noz.x-490)>190){
+   trust=Math.max(0,trust-1);water[503]+=2.5;beep(120,.2,.06);msg=`⚠ ${wrongBranch.room}号室へ誤侵入！ 室内水濡れリスク`;msgT=3;noz.x=490;noz.y=wrongBranch.y+35;wrongBranch=null
+ }
+ if(Math.abs(noz.y-225)<45&&noz.x>545) {
+   inHidden=noz.x>635&&noz.x<800;
+   if(jet&&Math.cos(ang)>.2)noz.x+=38*dt;
+ }
+ noz.x=Math.min(865,noz.x);
+
+ if(jet){
+  let dirs=[ang+Math.PI-.52,ang+Math.PI-.18,ang+Math.PI+.18,ang+Math.PI+.52];
+  dirt.forEach(d=>{if(d.dead)return;let dx=d.x-noz.x,dy=d.y-noz.y,dist=Math.hypot(dx,dy);if(dist>140)return;let a=Math.atan2(dy,dx),hit=dirs.some(q=>Math.abs(Math.atan2(Math.sin(a-q),Math.cos(a-q)))<.24);
+    if(hit){d.hp-=dt*(d.hard?25:58);if(inHidden)hiddenClean+=dt;if(Math.random()<dt*6)beep(d.hard?135:180,.03,.018);if(d.hp<=0){d.hp=0;d.dead=true;spawnChunk(d);if(d.zone==="503"){msg="枝管から汚れ塊が立て管へ流下";msgT=1.8}}}
+  })
+ }
+ chunks.forEach(ch=>{
+   if(ch.x>515)ch.x-=82*dt;else if(ch.x<465)ch.x+=82*dt;
+   if(Math.abs(ch.x-490)<45){
+    let cap=capacity()/100;
+    if(!ch.stuck && Math.random()<dt*(1-cap)*1.7 && ch.y>235){ch.stuck=true;ch.vy=0;msg="⚠ 剥離汚れが立て管で再閉塞！";msgT=3;beep(95,.22,.07)}
+    if(!ch.stuck)ch.y+=ch.vy*dt;
+   }
+   if(ch.stuck)ch.life+=dt;
+ })
+ chunks=chunks.filter(ch=>ch.y<H+40);
+ const stuck=chunks.filter(c=>c.stuck).length;
+ if(stuck){water[403]+=stuck*.8*dt;water[302]+=stuck*.6*dt;water[503]+=stuck*.35*dt}
+ else{
+   if(capacity()>55){water[403]-=2*dt;water[302]-=1.5*dt}
+   if(remain("503")<.45&&capacity()>55)water[503]-=8.0*dt;
+   if(remain("503")<.12&&capacity()>72)water[503]-=15.0*dt;
+ }
+ if(jet)chunks.forEach(ch=>{if(!ch.stuck)return;let d=Math.hypot(ch.x-noz.x,ch.y-noz.y);if(d<110){ch.life+=3*dt;if(ch.life>2.5){ch.stuck=false;ch.vy=45;msg="再閉塞を解除！";msgT=1.7}}});
+ Object.keys(water).forEach(k=>water[k]=Math.max(0,Math.min(100,water[k])));
+ hose.push({x:noz.x,y:noz.y});if(hose.length>110)hose.shift();
+ updateSense();
+ if(water[503]>=100||water[403]>=100||water[302]>=100){end(false,"逆流・あふれ事故発生");return}
+ if(t<=0){end(false,"TIME UP");return}
+ if(remain("503")<.02&&remain("riser")<.04&&chunks.length===0&&water[503]<1&&water[403]<10&&water[302]<10){end(true,"MISSION COMPLETE");return}
+ updateUI()
+}
+
+function drawPipe(){
+ ctx.lineCap="round";ctx.lineJoin="round";ctx.strokeStyle="#4b585e";ctx.lineWidth=172;ctx.beginPath();ctx.moveTo(490,700);ctx.lineTo(490,110);ctx.stroke();ctx.strokeStyle="#111b20";ctx.lineWidth=136;ctx.stroke();
+ branches.forEach(b=>{ctx.strokeStyle="#4b585e";ctx.lineWidth=120;ctx.beginPath();ctx.moveTo(490,b.y);ctx.lineTo(b.side>0?925:85,b.y);ctx.stroke();ctx.strokeStyle="#111b20";ctx.lineWidth=90;ctx.stroke()})
+}
+function drawD(d){if(d.dead)return;ctx.save();ctx.translate(d.x,d.y);let s=18+24*d.s;ctx.fillStyle=d.hard?"#8d9295":d.zone==="503"?"#84562b":"#6f6848";ctx.beginPath();for(let i=0;i<12;i++){let a=i/12*Math.PI*2,r=s*(.75+.14*Math.sin(i*5));i?ctx.lineTo(Math.cos(a)*r,Math.sin(a)*r):ctx.moveTo(Math.cos(a)*r,Math.sin(a)*r)}ctx.closePath();ctx.fill();if(d.hard){ctx.strokeStyle="#c9ced0";ctx.lineWidth=3;ctx.stroke()}ctx.restore()}
+function drawNozzle(){
+ if(hose.length>1){ctx.strokeStyle="#d4a72e";ctx.lineWidth=12;ctx.beginPath();ctx.moveTo(490,700);for(const p of hose)ctx.lineTo(p.x,p.y);ctx.stroke()}
+ ctx.save();ctx.translate(noz.x,noz.y);ctx.rotate(ang);let g=ctx.createLinearGradient(-25,0,30,0);g.addColorStop(0,"#68757a");g.addColorStop(.5,"#eef5f6");g.addColorStop(1,"#727e82");ctx.fillStyle=g;ctx.beginPath();ctx.roundRect(-25,-15,52,30,9);ctx.fill();
+ if(jet)[-.52,-.18,.18,.52].forEach(a=>{ctx.save();ctx.translate(-7,0);ctx.rotate(Math.PI+a);let j=ctx.createLinearGradient(0,0,100,0);j.addColorStop(0,"#fff");j.addColorStop(.25,"rgba(87,218,255,.9)");j.addColorStop(1,"rgba(87,218,255,0)");ctx.strokeStyle=j;ctx.lineWidth=6;ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(105,0);ctx.stroke();ctx.restore()});ctx.restore()
+}
+function sink(room,y,val,side){let xx=side>0?840:35;ctx.fillStyle="#d4d0c4";ctx.fillRect(xx,y-42,100,60);ctx.fillStyle="#687b80";ctx.beginPath();ctx.ellipse(xx+50,y-5,36,13,0,0,7);ctx.fill();ctx.fillStyle=val>75?"#7d4835":"#5e633e";ctx.beginPath();ctx.ellipse(xx+50,y-4,31,Math.max(2,10*val/100),0,0,7);ctx.fill();ctx.fillStyle="#e8f5fa";ctx.font="bold 13px system-ui";ctx.textAlign="center";ctx.fillText(room+"号室 "+Math.round(val)+"%",xx+50,y-55)}
+function draw(){
+ ctx.clearRect(0,0,W,H);let bg=ctx.createLinearGradient(0,0,0,H);bg.addColorStop(0,"#26363d");bg.addColorStop(1,"#071015");ctx.fillStyle=bg;ctx.fillRect(0,0,W,H);drawPipe();
+ dirt.forEach(drawD);chunks.forEach(ch=>{ctx.fillStyle=ch.stuck?"#c6683f":"#a97843";ctx.beginPath();ctx.arc(ch.x,ch.y,ch.r,0,7);ctx.fill();if(ch.stuck){ctx.strokeStyle="#ffb36f";ctx.lineWidth=3;ctx.stroke()}});
+ drawNozzle();sink("503",225,water[503],1);sink("403",350,water[403],1);sink("302",470,water[302],-1);
+ ctx.fillStyle="#69df7a";ctx.fillRect(28,18,(W-56)*capacity()/100,7);ctx.fillStyle="#eaf6fa";ctx.font="bold 13px system-ui";ctx.textAlign="left";ctx.fillText("立て管流下能力 "+Math.round(capacity())+"%",28,48);
+
+ // hidden pipe section mask
+ if(inHidden || (noz.x>600&&noz.y<275)){
+   ctx.fillStyle="rgba(9,16,20,.94)";ctx.fillRect(620,160,210,135);
+   ctx.strokeStyle="#586b73";ctx.lineWidth=4;ctx.strokeRect(620,160,210,135);
+   ctx.fillStyle="#dcebf0";ctx.font="bold 16px system-ui";ctx.textAlign="center";ctx.fillText("見えない配管区間",725,205);
+   ctx.font="13px system-ui";ctx.fillStyle="#a9c0ca";ctx.fillText("音・臭気・排出水・振動で判断",725,233);
+ }
+ // discharge water sample
+ let turb=Math.min(100,remain("503")*65+remain("riser")*45+chunks.length*3);
+ ctx.fillStyle="#d2d8d5";ctx.fillRect(20,590,180,70);ctx.fillStyle=`rgba(94,77,43,${.25+turb/140})`;ctx.fillRect(30,620,160,26);
+ ctx.fillStyle="#e8f5fa";ctx.font="bold 12px system-ui";ctx.textAlign="left";ctx.fillText("排出水サンプル",30,610);ctx.fillText("濁り "+Math.round(turb)+"%",30,654);
+
+ if(msgT>0){ctx.fillStyle="#07131ddd";ctx.fillRect(150,65,680,48);ctx.fillStyle=msg.includes("⚠")?"#ff897e":"#7fe8ff";ctx.font="bold 18px system-ui";ctx.textAlign="center";ctx.fillText(msg,490,96)}
+}
+function end(ok,title){
+ run=false;setJet(false);setPull(false);stopSpray();
+ const result=`503号室 ${Math.round(water[503])}% ／ 403号室 ${Math.round(water[403])}% ／ 302号室 ${Math.round(water[302])}%<br>立て管流下能力 ${Math.round(capacity())}% ／ 信頼度 ${"★".repeat(trust)+"☆".repeat(5-trust)}`;
+ O.innerHTML=`<div class="card"><small>${ok?"PERFECT OPERATION":"MISSION FAILED"}</small><h1>${title}</h1><p>${result}</p>${ok?'<p><b style="color:#7de98b">あふれ事故回避・他住戸逆流なし・完全洗浄！</b><br>見えない区間も感覚情報を使って洗浄できました。</p>':'<p>立て管の流下能力、枝管の方向、見えない区間の感覚情報をもう一度確認してみてください。</p>'}<button class="btn" id="retry">RETRY</button></div>`;
+ O.classList.remove("hide");document.getElementById("retry").addEventListener("click",()=>start(soundOn))
+}
+function start(snd){soundOn=snd;E.sound.textContent=soundOn?"🔊 音あり":"🔇 音なし";reset();O.classList.add("hide");run=true;last=performance.now();cancelAnimationFrame(raf);raf=requestAnimationFrame(loop)}
+document.getElementById("soundOn").addEventListener("click",()=>start(true));document.getElementById("soundOff").addEventListener("click",()=>start(false));
+E.sound.addEventListener("click",()=>{soundOn=!soundOn;E.sound.textContent=soundOn?"🔊 音あり":"🔇 音なし";if(!soundOn)stopSpray();else if(jet)spraySound(true)});
+function loop(n){let dt=Math.min(.033,(n-last)/1000||0);last=n;if(run){update(dt);draw();raf=requestAnimationFrame(loop)}}reset();draw()
+})();
+</script>
+</body></html>
